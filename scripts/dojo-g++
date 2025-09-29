@@ -1,4 +1,43 @@
 #!/bin/bash
 # dojo-g++ : drop-in replacement for g++ that compiles inside dojo container
 
-docker run --rm -v "$PWD":/src -w /src dojo-gpp g++ "$@"
+CONTAINER_NAME="dojo-gpp"
+
+# Function to check if container is running
+is_container_running() {
+    docker ps --filter "name=$CONTAINER_NAME" --filter "status=running" --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"
+}
+
+# Function to check if container exists (stopped or running)
+container_exists() {
+    docker ps -a --filter "name=$CONTAINER_NAME" --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"
+}
+
+# Function to start the container
+start_container() {
+    echo "Starting dojo-gpp container..." >&2
+    docker run -d --name "$CONTAINER_NAME" -v "$PWD":/src -w /src dojo-gpp tail -f /dev/null
+}
+
+# Function to build image if it doesn't exist
+ensure_image_exists() {
+    if ! docker image inspect dojo-gpp >/dev/null 2>&1; then
+        echo "Building dojo-gpp image..." >&2
+        SCRIPT_DIR="$(dirname "$(dirname "$(readlink -f "$0")")")"
+        docker build -t dojo-gpp -f "$SCRIPT_DIR/Dockerfile.dojo-gpp" "$SCRIPT_DIR"
+    fi
+}
+
+ensure_image_exists
+
+if ! is_container_running; then
+    if container_exists; then
+        echo "Starting existing dojo-gpp container..." >&2
+        docker start "$CONTAINER_NAME" >/dev/null
+    else
+        start_container >/dev/null
+    fi
+fi
+
+# Execute g++ in the running container
+docker exec -w /src "$CONTAINER_NAME" g++ "$@"
