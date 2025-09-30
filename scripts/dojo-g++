@@ -30,14 +30,5 @@ ensure_image_exists() {
 
 ensure_image_exists
 
-if ! is_container_running; then
-    if container_exists; then
-        echo "Starting existing dojo-gpp container..." >&2
-        docker start "$CONTAINER_NAME" >/dev/null
-    else
-        start_container >/dev/null
-    fi
-fi
+docker run --rm -v "$PWD":/src -w /src dojo-gpp g++ "$@"
 
-# Execute g++ in the running container
-docker exec -w /src "$CONTAINER_NAME" g++ "$@"
